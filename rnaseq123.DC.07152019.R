@@ -19,6 +19,7 @@ counts <- read_delim("2019.07.12.counts.txt",
 View(counts)
 head(counts)
 rownames(counts) <- counts$GeneSymbol
+library(dplyr)
 DC <- select(counts, contains("DC")) #Dendritic cells
 counts.m <- as.matrix(DC)
 class(counts.m)
