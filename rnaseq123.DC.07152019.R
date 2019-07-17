@@ -12,7 +12,8 @@
 #library(gplots)
 
 #Data packaging
-#Read in featureCounts count data
+#Read in featureCounts count data, select DCs for analysis
+#For Shiny- allow user to pick dataset to analyze (for this dataset, can analyze DP or DC populations)
 library(readr)
 counts <- read_delim("2019.07.12.counts.txt", 
                      "\t", escape_double = FALSE, trim_ws = TRUE)
@@ -90,6 +91,7 @@ data$samples$norm.factors
 #[1] 1.0742536 1.0634345 0.9199327 0.9146074 0.9555229 0.9862703 1.1039632
 
 #Unsupervised clustering of samples, generate MDS plot
+#For Shiny- generate plot for user
 library(RColorBrewer)
 cpm <- cpm(data)
 lcpm <- cpm(data, log=TRUE)
@@ -129,6 +131,7 @@ tfit <- treat(vfit, lfc=log2(1.5))
 plotSA(tfit, main="Final model: Mean-variance trend")
 
 #Examining the number of DE genes
+#For Shiny- print out summaries for user, allow user to decide test
 summary(decideTests(efit))
 #       DC.D0vsD4 DC.D0vsD7 DC.D4vsD7
 #Down        1557       393      1084
@@ -147,6 +150,7 @@ length(de.common)
 head(efit$genes$SYMBOL[de.common], n=20)
 
 #Generate venn diagrams for shared up-regulated and down-regulated genes
+#For Shiny- generate venn diagrams for user, choice in color?
 vennDiagram(de[,1:3], include = "up",
             circle.col=c("red", "blue", "green"), main= "Up-regulated genes in dendritic cells, eBays")
 vennDiagram(dt[,1:3], include = "up",
@@ -166,6 +170,7 @@ DC.d4vsd7 <- topTreat(tfit, coef=3, n=Inf)
 head(DC.d0vsd4)
 
 #MD plots of differential expression results
+#For Shiny- generate MD plots
 plotMD(efit, column=1, status=de[,1], main=colnames(efit)[1], 
        xlim=c(-5,15))
 plotMD(tfit, column=1, status=dt[,1], main=colnames(tfit)[1], col= c("blue", "red"),
@@ -176,11 +181,13 @@ plotMD(tfit, column=3, status=dt[,3], main=colnames(tfit)[3], col= c("blue", "re
        xlim=c(-5,15))
 
 #Glimma MD plots
+#For Shiny- can Glimma be integrated? Does CSS play well with Shiny?
 library(Glimma)
 glMDPlot(tfit, coef=3, status=dt, main=colnames(tfit)[3],
          side.main="SYMBOL", counts=lcpm, groups=group, launch=FALSE)
 
-#Generate geatmap
+#Generate heatmap
+#For Shiny- generate heatmap for user, allow user to determine how many genes plotted, what comparison to plot
 library(gplots)
 DC.d0vsd4.topgenes <- DC.d0vsd4$SYMBOL[1:100]
 i <- which(v$genes$SYMBOL %in% DC.d0vsd4.topgenes)
@@ -210,7 +217,11 @@ heatmap.2(lcpm[both,], scale="row",
           keysize = 1)
 
 #Gene set testing with camera
-#load(system.file("mouse_c2_v5p1.rda", package = "RNAseq123"))
+#install.packages("msigdbr")
+library(msigdbr)
+#For Shiny- user selects gene set collection, view results of head() and choose direction
+#Retrieve mouse curated collection (C2) gene sets
+load("~/kcooper2_RNAeasy123/MSigDB/mouse_c2_v5p2.rdata")
 idx <- ids2indices(Mm.c2,id=v$genes$ENTREZID)
 cam.DC.d0vsd4 <- camera(v,idx,design,contrast=contr.matrix[,1])
 head(cam.DC.d0vsd4,5)
@@ -226,6 +237,8 @@ head(cam.DC.d4vsd7,5)
 write.csv(cam.DC.d4vsd7, "camera.DC.d4vsd7.csv")
 
 #Barcode example
+#For Shiny- generate barcode, choose gene set
+dev.off()
 barcodeplot(tfit$t[,1], index=idx$NEMETH_INFLAMMATORY_RESPONSE_LPS_UP, 
             index2=idx$REACTOME_GENERIC_TRANSCRIPTION_PATHWAY, main="DC D0vsD4")
 
