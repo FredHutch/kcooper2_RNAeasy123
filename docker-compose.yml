@@ -1,0 +1,9 @@
+version: '2'
+services:
+  rnaeasy123:
+    image: dockerimages.fhcrc.org/rnaeasy123:latest
+
+    labels:
+      io.rancher.container.pull_image: always
+
+    restart: always
