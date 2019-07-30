@@ -221,7 +221,7 @@ heatmap.2(lcpm[both,], scale="row",
 library(msigdbr)
 #For Shiny- user selects gene set collection, view results of head() and choose direction
 #Retrieve mouse curated collection (C2) gene sets
-load("~/kcooper2_RNAeasy123/MSigDB/mouse_c2_v5p2.rdata")
+load("MSigDB/mouse_c2_v5p2.rdata")
 idx <- ids2indices(Mm.c2,id=v$genes$ENTREZID)
 cam.DC.d0vsd4 <- camera(v,idx,design,contrast=contr.matrix[,1])
 head(cam.DC.d0vsd4,5)
