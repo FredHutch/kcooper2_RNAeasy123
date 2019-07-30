@@ -1,3 +1,4 @@
+getOutput <- function() {
 #RNA-seq analysis is easy as 1-2-3 with limma, Glimma and edgeR
 #https://www.bioconductor.org/help/workflows/RNAseq123/
 
@@ -14,19 +15,19 @@
 #Data packaging
 #Read in featureCounts count data, select DCs for analysis
 #For Shiny- allow user to pick dataset to analyze (for this dataset, can analyze DP or DC populations)
+output <- list()
 library(readr)
 counts <- read_delim("2019.07.12.counts.txt", 
                      "\t", escape_double = FALSE, trim_ws = TRUE)
-View(counts)
+# View(counts)
 head(counts)
 rownames(counts) <- counts$GeneSymbol
 library(dplyr)
-print(paste("counts class is", class(counts)))
-DC <- select(counts, contains("DC")) #Dendritic cells
+DC <- dplyr::select(counts, contains("DC")) #Dendritic cells
 counts.m <- as.matrix(DC)
 class(counts.m)
 head(counts.m)
-detach("package:dplyr", unload=TRUE) #Detatch because dplyr masks some required packages for limma
+# detach("package:dplyr", unload=TRUE) #Detatch because dplyr masks some required packages for limma
 
 #Set up
 library(limma)
@@ -103,10 +104,12 @@ col.group <- as.character(col.group)
 col.batch <- batch
 levels(col.batch) <-  brewer.pal(nlevels(col.batch), "Set2")
 col.batch <- as.character(col.batch)
-plotMDS(lcpm, labels=group, col=col.group)
-title(main="A. SL-TBI")
-plotMDS(lcpm, labels=batch, col=col.batch, dim=c(3,4))
-title(main="B. Batch")
+# plotMDS(lcpm, labels=group, col=col.group)
+output$sl.tbi <- list(x=lcpm, labels=group, col=col.group)
+# title(main="A. SL-TBI")
+# plotMDS(lcpm, labels=batch, col=col.batch, dim=c(3,4))
+# title(main="B. Batch")
+output$batch <- list(x=lcpm, labels, batch, col=col.batch, dim=c(3,4))
 
 
 #Creating a design matrix and contrasts
@@ -129,16 +132,17 @@ vfit <- lmFit(v, design)
 vfit <- contrasts.fit(vfit, contrasts=contr.matrix)
 efit <- eBayes(vfit)
 tfit <- treat(vfit, lfc=log2(1.5))
-plotSA(tfit, main="Final model: Mean-variance trend")
+# plotSA(tfit, main="Final model: Mean-variance trend")
+output$tfit <- list(x=tfit, main="Final model: Mean-variance trend")
 
 #Examining the number of DE genes
 #For Shiny- print out summaries for user, allow user to decide test
-summary(decideTests(efit))
+output$efitSummary <- summary(decideTests(efit))
 #       DC.D0vsD4 DC.D0vsD7 DC.D4vsD7
 #Down        1557       393      1084
 #NotSig     10966     13413     11803
 #Up          1649       366      1285
-summary(decideTests(tfit))
+output$tfitSummary <- summary(decideTests(tfit))
 #       DC.D0vsD4 DC.D0vsD7 DC.D4vsD7
 #Down         649       151       286
 #NotSig     13062     13893     13396
@@ -152,15 +156,19 @@ head(efit$genes$SYMBOL[de.common], n=20)
 
 #Generate venn diagrams for shared up-regulated and down-regulated genes
 #For Shiny- generate venn diagrams for user, choice in color?
-vennDiagram(de[,1:3], include = "up",
-            circle.col=c("red", "blue", "green"), main= "Up-regulated genes in dendritic cells, eBays")
-vennDiagram(dt[,1:3], include = "up",
-            circle.col=c("red", "blue", "green"), main= "Up-regulated genes in dendritic cells, LFC")
+# vennDiagram(de[,1:3], include = "up",
+#             circle.col=c("red", "blue", "green"), main= "Up-regulated genes in dendritic cells, eBays")
+output$vennUpEbays <- list(x=de[,1:3], include="up", circle.col=c("red", "blue", "green"), main="Up-regulated genes in dendritic cells, eBays")
+# vennDiagram(dt[,1:3], include = "up",
+#             circle.col=c("red", "blue", "green"), main= "Up-regulated genes in dendritic cells, LFC")
+output$vennUpLFC <- list(x=dt[,1:3], include="up", circle.col=c("red", "blue", "green"), main="Up-regulated genes in dendritic cells, LFC")
+# vennDiagram(de[,1:3], include = "down",
+#             circle.col=c("red", "blue", "green"), main= "Down-regulated genes in dendritic cells, eBays")
+output$vennDownEbays <- list(x=de[,1:3], include="down", main="Down-regulated genes in dendritic cells, eBays")
 
-vennDiagram(de[,1:3], include = "down",
-            circle.col=c("red", "blue", "green"), main= "Down-regulated genes in dendritic cells, eBays")
-vennDiagram(dt[,1:3], include = "down",
-            circle.col=c("red", "blue", "green"), main= "Down-regulated genes in dendritic cells, LFC")
+# vennDiagram(dt[,1:3], include = "down",
+#             circle.col=c("red", "blue", "green"), main= "Down-regulated genes in dendritic cells, LFC")
+output$vennDownLFC <- list(x=dt[,1:3], include="down", circle.col=c("red", "blue", "green"), main="Down-regulated genes in dendritic cells, LFC")
 
 write.fit(tfit, dt, file="DEresults.lfc.txt")
 
@@ -172,14 +180,19 @@ head(DC.d0vsd4)
 
 #MD plots of differential expression results
 #For Shiny- generate MD plots
-plotMD(efit, column=1, status=de[,1], main=colnames(efit)[1], 
-       xlim=c(-5,15))
-plotMD(tfit, column=1, status=dt[,1], main=colnames(tfit)[1], col= c("blue", "red"),
-       xlim=c(-5,15))
-plotMD(tfit, column=2, status=dt[,2], main=colnames(tfit)[2], col= c("blue", "red"),
-       xlim=c(-5,15))
-plotMD(tfit, column=3, status=dt[,3], main=colnames(tfit)[3], col= c("blue", "red"),
-       xlim=c(-5,15))
+# plotMD(efit, column=1, status=de[,1], main=colnames(efit)[1], 
+#        xlim=c(-5,15))
+output$efit <- list(x=efit, column=1, status=de[,1], main=colnames(efit)[1], xlim=c(-5,15))
+
+# plotMD(tfit, column=1, status=dt[,1], main=colnames(tfit)[1], col= c("blue", "red"),
+#        xlim=c(-5,15))
+output$tfit1 <- list(x=tfit, column=1, status=dt[,1], main=colnames(tfit)[1], col=c("blue", "red"), xlim=c(-5,15))
+# plotMD(tfit, column=2, status=dt[,2], main=colnames(tfit)[2], col= c("blue", "red"),
+#        xlim=c(-5,15))
+output$tfit2 <- list(x=tfit, column=2, status=dt[,2], main=colnames(tfit)[2], col=c("blue", "red"), xlim=c(-5, 15))
+# plotMD(tfit, column=3, status=dt[,3], main=colnames(tfit)[3], col= c("blue", "red"),
+#        xlim=c(-5,15))
+output$tfit3 <- list(x=tfit, column=3, status=dt[,3], main=colnames(tfit)[3], col=c("blue", "red"), xlim=c(-5, 15))
 
 #Glimma MD plots
 #For Shiny- can Glimma be integrated? Does CSS play well with Shiny?
@@ -240,7 +253,12 @@ write.csv(cam.DC.d4vsd7, "camera.DC.d4vsd7.csv")
 #Barcode example
 #For Shiny- generate barcode, choose gene set
 dev.off()
-barcodeplot(tfit$t[,1], index=idx$NEMETH_INFLAMMATORY_RESPONSE_LPS_UP, 
+# return (barcodeplot(tfit$t[,1], index=idx$NEMETH_INFLAMMATORY_RESPONSE_LPS_UP, 
+#             index2=idx$REACTOME_GENERIC_TRANSCRIPTION_PATHWAY, main="DC D0vsD4"))
+output$plot1 <-  list(x=tfit$t[,1], index=idx$NEMETH_INFLAMMATORY_RESPONSE_LPS_UP, 
             index2=idx$REACTOME_GENERIC_TRANSCRIPTION_PATHWAY, main="DC D0vsD4")
 
-sessionInfo()
+print("done with getOutput(), returning...")
+return (output)
+# sessionInfo()
+}

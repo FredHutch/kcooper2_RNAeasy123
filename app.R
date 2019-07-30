@@ -1,12 +1,28 @@
 # This is just a dummy hello world shiny app at the moment.
 
+getCounts <- function() {
+  library(readr)
+  counts <- read_delim("2019.07.12.counts.txt", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+  # # rownames(counts) <- counts$GeneSymbol
+
+}
+
+
+# getPlot1 <- function() {
+#   library(limma)
+#   # return(barcodeplot(1:10, index=1))
+#   return (list(x=1:10, index=1))
+
+# }
+
 library(shiny)
 
 # Define UI for app that draws a histogram ----
 ui <- fluidPage(
 
   # App title ----
-  titlePanel("Hello Shiny!"),
+  titlePanel("RNAeasy123"),
 
   # Sidebar layout with input and output definitions ----
   sidebarLayout(
@@ -15,19 +31,20 @@ ui <- fluidPage(
     sidebarPanel(
 
       # Input: Slider for the number of bins ----
-      sliderInput(inputId = "bins",
-                  label = "Number of bins:",
-                  min = 1,
-                  max = 50,
-                  value = 30)
+    #   sliderInput(inputId = "bins",
+    #               label = "Number of bins:",
+    #               min = 1,
+    #               max = 50,
+    #               value = 30)
 
     ),
 
     # Main panel for displaying outputs ----
     mainPanel(
+      h2("Counts"),
+      DT::dataTableOutput("mytable"),
+      plotOutput("plot1")
 
-      # Output: Histogram ----
-      plotOutput(outputId = "distPlot")
 
     )
   )
@@ -44,16 +61,17 @@ server <- function(input, output) {
   # 1. It is "reactive" and therefore should be automatically
   #    re-executed when inputs (input$bins) change
   # 2. Its output type is a plot
-  output$distPlot <- renderPlot({
+  output$mytable = DT::renderDataTable({getCounts()})
+  source("funcs.R", max=Inf)
 
-    x    <- faithful$waiting
-    bins <- seq(min(x), max(x), length.out = input$bins + 1)
+  library(limma)
+  system.time({plotData =  getOutput()})
 
-    hist(x, breaks = bins, col = "#75AADB", border = "white",
-         xlab = "Waiting time to next eruption (in mins)",
-         main = "Histogram of waiting times")
+  pl <- plotData$plot1
 
-    })
+  output$plot1 = renderPlot({  barcodeplot(pl$x, index=pl$index, index2=pl$index2, main=pl$main) }) 
+  # output$plot1 = renderPlot({barcodeplot(1:10, index=1) })
+  # output$plot1 = renderPlot({ plot(1:10)})
 
 }
 

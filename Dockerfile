@@ -2,7 +2,7 @@
 FROM fredhutch/r-shiny-server-base:3.6.0
 
 RUN R -e "install.packages('BiocManager')"
-RUN R -e "BiocManager::install(c('readr','limma','Glimma','edgeR','Mus.musculus','RColorBrewer','gplots','msigdbr'))"
+RUN R -e "BiocManager::install(c('readr','limma','Glimma','edgeR','Mus.musculus','RColorBrewer','gplots','msigdbr','DT'))"
 
 EXPOSE 3838
 
