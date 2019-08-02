@@ -81,8 +81,6 @@ makeUSPlot <- function(input) {
     group <- as.factor(rep(c("D0", "D4", "D7"), c(2,3,2)))
     data$samples$group <- group
     geneid <- rownames(cells)
-    geneid_from_shiny <- geneid
-    save("geneid_from_shiny", file="geneid_from_shiny.rda")
     genes <- select(Mus.musculus, keys=geneid, columns=c("ENTREZID", "TXCHROM"), 
                     keytype="SYMBOL")
     genes <- genes[!duplicated(genes$SYMBOL),]
