@@ -63,44 +63,17 @@ ui <- fluidPage(
   )
 )
 
-getData <- function(input) {
-  # redundant reading of counts file:
-  counts <- read_delim(input$fileChooser, 
-        "\t", escape_double = FALSE, trim_ws = TRUE)
-  cells <- dplyr::select(counts, contains(input$cellTypeChooser))
-
-  counts.m <- as.matrix(cells)
-
-  data <- DGEList(counts.m)
-  samplenames <- substring(colnames(data), 1, nchar(colnames(data)))
-  batch <- as.factor(c("09182018", "09182018", 
-                     "09182018", "09182018", "09182018", 
-                     "10312018", "10312018"))
-  group <- as.factor(rep(c("D0", "D4", "D7"), c(2,3,2)))
-  data$samples$group <- group
-  data
-}
-
-server <- function(input, output) {
-  output$mytable = shiny::renderDataTable({
-      read_delim(input$fileChooser, 
-        "\t", escape_double = FALSE, trim_ws = TRUE)
-  })
-
-  # cells <- reactive({dplyr::select(counts, contains(input$cellTypeChooser)) })
-  # counts.m <- reactive({as.matrix(cells)})
-  # data <- getData(input)
-
-  output$leftUSPlot <- renderPlot({
-    # redundant read of counts
+makeUSPlot <- function(input) {
     counts <- read_delim(input$fileChooser, 
         "\t", escape_double = FALSE, trim_ws = TRUE)
+    rownames(counts) <- counts$GeneSymbol
+
     cells <- dplyr::select(counts, contains(input$cellTypeChooser))
     counts.m <- as.matrix(cells)
     data <- DGEList(counts.m)
     samplenames <- substring(colnames(data), 1, nchar(colnames(data)))
     colnames(data) <- samplenames
-    # batch is hardcoded atm
+    # batch is hardcoded atm - TODO FIXME
     batch <- as.factor(c("09182018", "09182018", 
                      "09182018", "09182018", "09182018", 
                      "10312018", "10312018"))
@@ -108,7 +81,8 @@ server <- function(input, output) {
     group <- as.factor(rep(c("D0", "D4", "D7"), c(2,3,2)))
     data$samples$group <- group
     geneid <- rownames(cells)
-    print(paste("geneid is", geneid))
+    geneid_from_shiny <- geneid
+    save("geneid_from_shiny", file="geneid_from_shiny.rda")
     genes <- select(Mus.musculus, keys=geneid, columns=c("ENTREZID", "TXCHROM"), 
                     keytype="SYMBOL")
     genes <- genes[!duplicated(genes$SYMBOL),]
@@ -131,34 +105,27 @@ server <- function(input, output) {
     col.batch <- batch
     levels(col.batch) <-  brewer.pal(nlevels(col.batch), "Set2")
     col.batch <- as.character(col.batch)
-    plotMDS(lcpm, labels=group, col=col.group)
+    return (list(lcpm=lcpm, group=group, batch=batch, col.group=col.group, col.batch=col.batch, dim=c(3,4)))
+}
+
+
+
+server <- function(input, output) {
+  output$mytable = shiny::renderDataTable({
+      read_delim(input$fileChooser, 
+        "\t", escape_double = FALSE, trim_ws = TRUE)
   })
 
-  sd <- 0.3*sqrt(4/rchisq(1000,df=4))
-  x <- matrix(rnorm(1000*6,sd=sd),1000,6)
-  rownames(x) <- paste("Gene",1:1000)
-  x[1:50,4:6] <- x[1:50,4:6] + 2
-  # without labels, indexes of samples are plotted.
-  mds <- plotMDS(x,  col=c(rep("black",3), rep("red",3)) )
-  # or labels can be provided, here group indicators:
-  # plotMDS(mds,  col=c(rep("black",3), rep("red",3)), labels= c(rep("Grp1",3), rep("Grp2",3)))
 
-  # output$leftUSPlot <- renderPlot({  plotMDS(mds,  col=c(rep("black",3), rep("red",3)), labels= c(rep("Grp1",3), rep("Grp2",3)))})
+  output$leftUSPlot <- renderPlot({
+    left <- makeUSPlot(input)
+    plotMDS(left$lcpm, labels=left$group, col=left$col.group)
+  })
 
-
-
-
-
-  # output$leftUSPlot <- renderPlot(plot(1:10))
-  output$rightUSPlot <- renderPlot(plot(10:1))
-  # source("funcs.R", max=Inf)
-
-  # library(limma)
-  # system.time({plotData =  getOutput()})
-
-  # pl <- plotData$plot1
-
-  # output$plot1 = renderPlot({  barcodeplot(pl$x, index=pl$index, index2=pl$index2, main=pl$main) }) 
+  output$rightUSPlot <- renderPlot({
+    right <- makeUSPlot(input)
+    plotMDS(right$lcpm, labels=right$batch, col=right$col.batch, dim=right$dim)
+  })
 
 }
 
