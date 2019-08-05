@@ -23,38 +23,39 @@ getFileChoices <- function() {
 
 filesAvailable <- getFileChoices() # Get file list to populate the drop down menu
 
-ui <- fluidPage(
 
+ui <- fluidPage(
+  
   # App title ----
   titlePanel("RNAeasy123"),
-
+  
   # Sidebar layout with input and output definitions ----
   sidebarLayout(
-
+    
     # Sidebar panel for inputs ----
     sidebarPanel(
-        selectInput("fileChooser", "Choose a file",
-          filesAvailable),
-        # for now we are hardcoding the cell types
-        # TODO fix that....
-        selectInput("cellTypeChooser", "Choose a cell type",
-          c("DC", "DP")
-        ),
-        actionButton(inputId = "submitButton",
-          label = "Submit")
-
+      selectInput("fileChooser", "Choose a file",
+                  choices = filesAvailable, selected = filesAvailable[1]),
+      # for now we are hardcoding the cell types
+      # TODO fix that....
+      selectInput("cellTypeChooser", "Choose a cell type",
+                  choices = c("DC", "DP"), selected = "DC"
+      ),
+      actionButton(inputId = "submitButton",
+                   label = "Submit")
+      
     ),
-
+    
     # Main panel for displaying outputs ----
     mainPanel(
       tabsetPanel(type="tabs",
-        tabPanel("Counts", DTOutput("mytable")),
-        tabPanel("Unsup. Clustering",
-          fluidRow(
-            column(6, plotOutput("leftUSPlot")),
-            column(6, plotOutput("rightUSPlot"))
-          )
-        )
+                  tabPanel("Counts", DTOutput("mytable")),
+                  tabPanel("Unsup. Clustering",
+                           fluidRow(
+                             column(6, plotOutput("leftUSPlot")),
+                             column(6, plotOutput("rightUSPlot"))
+                           )
+                  )
       )
     )
   )
@@ -64,17 +65,17 @@ ui <- fluidPage(
 
 
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   # TODO add a function to get the data
-
+  
   getData <- eventReactive(input$submitButton, {
-      print(sessionInfo())
-      counts <- data.frame(read_delim(input$fileChooser,
-                           "\t", escape_double = FALSE, trim_ws = TRUE))
-      theseCells <- dplyr::select(counts, contains(input$cellTypeChooser))
-      rownames(theseCells) <- counts$GeneSymbol
-      theseCells
-    })
+    print(sessionInfo())
+    counts <- data.frame(read_delim(input$fileChooser,
+                                    "\t", escape_double = FALSE, trim_ws = TRUE))
+    theseCells <- dplyr::select(counts, contains(input$cellTypeChooser))
+    rownames(theseCells) <- counts$GeneSymbol
+    theseCells
+  })
   getMetaData <- eventReactive(input$submitButton, {
     metadataFile <- gsub("\\.txt$", ".csv", input$fileChooser)
     metadataFile <- gsub("\\.counts\\.", ".metadata.", metadataFile)
@@ -84,10 +85,10 @@ server <- function(input, output) {
   })
   
   output$mytable = DT::renderDT({
-      getData()
+    getData()
   }, rownames = TRUE, colnames = c('Gene Symbol' = 1))
-
-  makeUSPlot <- eventReactive(input$cellTypeChooser, {
+  
+  makeUSPlot <- eventReactive(input$submitButton, {
     cells <- getData()
     metadata <- getMetaData()
     counts.m <- as.matrix(cells)
@@ -96,8 +97,8 @@ server <- function(input, output) {
     data$samples$batch <- metadata$batch
     data$samples$group <- metadata$group
     data$genes <- select(Mus.musculus, keys=rownames(cells), 
-                              columns=c("ENTREZID", "TXCHROM"), 
-                              keytype="SYMBOL") %>% filter(!duplicated(SYMBOL))
+                         columns=c("ENTREZID", "TXCHROM"), 
+                         keytype="SYMBOL") %>% filter(!duplicated(SYMBOL))
     lcpm <- cpm(data, log=TRUE)
     # col.batch <- batch
     col.batch <- metadata$batch
@@ -106,17 +107,17 @@ server <- function(input, output) {
     return (list(lcpm=lcpm, batch=metadata$batch, col.batch=col.batch, dim=c(3,4)))
   })
   
-
+  
   output$leftUSPlot <- renderPlot({
     left <- makeUSPlot()
     plotMDS(left$lcpm, labels=left$group, col=left$col.group)
   })
-
+  
   output$rightUSPlot <- renderPlot({
     right <- makeUSPlot()
     plotMDS(right$lcpm, labels=right$batch, col=right$col.batch, dim=right$dim)
   })
-
+  
 }
 
 shinyApp(ui = ui, server = server)
