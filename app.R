@@ -68,6 +68,7 @@ server <- function(input, output) {
   # TODO add a function to get the data
 
   getData <- eventReactive(input$submitButton, {
+      print(sessionInfo())
       counts <- data.frame(read_delim(input$fileChooser,
                            "\t", escape_double = FALSE, trim_ws = TRUE))
       theseCells <- dplyr::select(counts, contains(input$cellTypeChooser))
