@@ -77,17 +77,17 @@ server <- function(input, output, session) {
   
   getData <- eventReactive(input$submitButton, {
     # print(sessionInfo())
-    counts <- data.frame(read_delim(input$fileChooser,
+    counts <- data.frame(read_delim("2019.07.12.counts.txt",
                                     "\t", escape_double = FALSE, trim_ws = TRUE))
-    theseCells <- dplyr::select(counts, contains(input$cellTypeChooser))
+    theseCells <- dplyr::select(counts, contains("DC"))
     rownames(theseCells) <- counts$GeneSymbol
     theseCells
   })
   getMetaData <- eventReactive(input$submitButton, {
     metadataFile <- gsub("\\.txt$", ".csv", input$fileChooser)
     metadataFile <- gsub("\\.counts\\.", ".metadata.", metadataFile)
-    metadata <- data.frame(read.csv(metadataFile), stringsAsFactors = TRUE)
-    thisMeta <- dplyr::filter(metadata, grepl(input$cellTypeChooser, sampleName)==TRUE)
+    metadata <- data.frame(read.csv("2019.07.12.metadata.csv"), stringsAsFactors = TRUE)
+    thisMeta <- dplyr::filter(metadata, grepl("DC", sampleName)==TRUE)
     thisMeta
   })
   
@@ -102,14 +102,17 @@ server <- function(input, output, session) {
     counts.m <- as.matrix(cells)
     data <- DGEList(counts.m)
     l <- makeUSPlot()
-    keep.exprs <- filterByExpr(l$data, group=metadata$group)
-    data <- l$data[keep.exprs,, keep.lib.sizes=FALSE]
+    #keep.exprs <- filterByExpr(l$data, group=metadata$group)
+    #data <- l$data[keep.exprs,, keep.lib.sizes=FALSE]
     #Normalising gene expression distributions
     data <- calcNormFactors(data, method = "TMM")
-    keep.exprs <- filterByExpr(cells, group=metadata$group)
-    data <- data[keep.exprs,, keep.lib.sizes=FALSE]
-    data <- calcNormFactors(data, method = "TMM")
+    #keep.exprs <- filterByExpr(cells, group=metadata$group)
+    #data <- data[keep.exprs,, keep.lib.sizes=FALSE]
+    #data <- calcNormFactors(data, method = "TMM")
+    print(metadata$group)
+
     design <- model.matrix(~0+metadata$group)
+    str(design)
     colnames(design) <- gsub("group", "", colnames(design))
     contr.matrix <- makeContrasts(
       DC.D0vsD4 = D0 - D4, 
