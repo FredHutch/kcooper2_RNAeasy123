@@ -52,9 +52,16 @@ ui <- fluidPage(
                   tabPanel("Counts", DTOutput("mytable")),
                   tabPanel("Unsup. Clustering",
                            fluidRow(
-                             column(6, plotOutput("leftUSPlot")),
-                             column(6, plotOutput("rightUSPlot"))
+                             # plot titles are hardcoded - TODO FIXME
+                             column(6, h2(align="center", "A. SL-TBI"), plotOutput("leftUSPlot")),
+                             column(6, h2(align="center", "B. Batch"), plotOutput("rightUSPlot"))
                            )
+                  ),
+                  tabPanel("Mean-variance trends",
+                    fluidRow(
+                      column(6, h2(align="center", "voom: Mean-variance trend"), plotOutput("leftMVPlot")),
+                      column(6, h2(align="center", "Final model: Mean-variance trend"), plotOutput("rightMVPlot"))
+                    )
                   )
       )
     )
@@ -69,7 +76,7 @@ server <- function(input, output, session) {
   # TODO add a function to get the data
   
   getData <- eventReactive(input$submitButton, {
-    print(sessionInfo())
+    # print(sessionInfo())
     counts <- data.frame(read_delim(input$fileChooser,
                                     "\t", escape_double = FALSE, trim_ws = TRUE))
     theseCells <- dplyr::select(counts, contains(input$cellTypeChooser))
@@ -88,6 +95,40 @@ server <- function(input, output, session) {
     getData()
   }, rownames = TRUE, colnames = c('Gene Symbol' = 1))
   
+
+  makeMVPlot <- eventReactive(input$submitButton, {
+    cells <- getData()
+    metadata <- getMetaData()
+    counts.m <- as.matrix(cells)
+    data <- DGEList(counts.m)
+    l <- makeUSPlot()
+    keep.exprs <- filterByExpr(l$data, group=metadata$group)
+    data <- l$data[keep.exprs,, keep.lib.sizes=FALSE]
+    #Normalising gene expression distributions
+    data <- calcNormFactors(data, method = "TMM")
+    keep.exprs <- filterByExpr(cells, group=metadata$group)
+    data <- data[keep.exprs,, keep.lib.sizes=FALSE]
+    data <- calcNormFactors(data, method = "TMM")
+    design <- model.matrix(~0+metadata$group)
+    colnames(design) <- gsub("group", "", colnames(design))
+    contr.matrix <- makeContrasts(
+      DC.D0vsD4 = D0 - D4, 
+      DC.D0vsD7 = D0 - D7,
+      DC.D4vsD7 = D4 - D7,
+      levels = colnames(design))
+
+    # par(mfrow=c(1,2))
+    v <- voom(data, design, plot=TRUE)
+    vfit <- lmFit(v, design)
+    vfit <- contrasts.fit(vfit, contrasts=contr.matrix)
+    efit <- eBayes(vfit)
+    tfit <- treat(vfit, lfc=log2(1.5))
+    print(paste("class of tfit is", class(tfit)))
+    # plotSA(tfit, main="Final model: Mean-variance trend")
+
+    return(list(tfit=tfit))
+  })
+
   makeUSPlot <- eventReactive(input$submitButton, {
     cells <- getData()
     metadata <- getMetaData()
@@ -104,7 +145,7 @@ server <- function(input, output, session) {
     col.batch <- metadata$batch
     levels(col.batch) <-  brewer.pal(nlevels(metadata$batch), "Set2")
     col.batch <- as.character(col.batch)
-    return (list(lcpm=lcpm, batch=metadata$batch, col.batch=col.batch, dim=c(3,4)))
+    return (list(lcpm=lcpm, batch=metadata$batch, col.batch=col.batch, data=data, dim=c(3,4)))
   })
   
   
@@ -116,6 +157,11 @@ server <- function(input, output, session) {
   output$rightUSPlot <- renderPlot({
     right <- makeUSPlot()
     plotMDS(right$lcpm, labels=right$batch, col=right$col.batch, dim=right$dim)
+  })
+
+  output$leftMVPlot <- renderPlot({
+    par(mfrow=c(1,2))
+    plotSA(makeMVPlot()$tfit, main="Final model: Mean-variance trend")
   })
   
 }
