@@ -18,7 +18,7 @@ library(DT)
 
 getFileChoices <- function() {
   files <- list.files()
-  files[grep(".txt", files, fixed=TRUE)]
+  files[grep("counts.txt", files, fixed=TRUE)]
 }
 
 filesAvailable <- getFileChoices() # Get file list to populate the drop down menu
@@ -37,6 +37,8 @@ ui <- fluidPage(
       selectInput("fileChooser", "Choose a file",
                   choices = filesAvailable, selected = filesAvailable[1]),
       # for now we are hardcoding the cell types
+      # in future we want to get the distinct cell type values 
+      # for each file when the file is selected
       # TODO fix that....
       selectInput("cellTypeChooser", "Choose a cell type",
                   choices = c("DC", "DP"), selected = "DC"
@@ -77,17 +79,17 @@ server <- function(input, output, session) {
   
   getData <- eventReactive(input$submitButton, {
     # print(sessionInfo())
-    counts <- data.frame(read_delim("2019.07.12.counts.txt",
+    counts <- data.frame(read_delim(input$fileChooser,
                                     "\t", escape_double = FALSE, trim_ws = TRUE))
-    theseCells <- dplyr::select(counts, contains("DC"))
+    theseCells <- dplyr::select(counts, contains(input$cellTypeChooser))
     rownames(theseCells) <- counts$GeneSymbol
     theseCells
   })
   getMetaData <- eventReactive(input$submitButton, {
     metadataFile <- gsub("\\.txt$", ".csv", input$fileChooser)
     metadataFile <- gsub("\\.counts\\.", ".metadata.", metadataFile)
-    metadata <- data.frame(read.csv("2019.07.12.metadata.csv"), stringsAsFactors = TRUE)
-    thisMeta <- dplyr::filter(metadata, grepl("DC", sampleName)==TRUE)
+    metadata <- data.frame(read.csv(metadataFile), stringsAsFactors = TRUE)
+    thisMeta <- dplyr::filter(metadata, grepl(input$cellTypeChooser, sampleName)==TRUE)
     thisMeta
   })
   
