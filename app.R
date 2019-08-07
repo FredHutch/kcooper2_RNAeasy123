@@ -2,26 +2,18 @@
 # source("app.R")
 # runApp()
 
-library(shiny)
-library(readr)
-library(dplyr)
-library(limma)
-library(Glimma)
-library(edgeR)
+library(shiny); library(readr); library(dplyr)
+library(limma); library(Glimma); library(edgeR)
 library(Mus.musculus)
-library(RColorBrewer)
-library(Glimma)
-library(gplots)
+library(RColorBrewer); library(gplots)
 library(msigdbr)
-library(DT)
+library(DT); library(plotly)
 
-
-getFileChoices <- function() {
-  files <- list.files()
-  files[grep("counts.txt", files, fixed=TRUE)]
+getProjects <- function() {
+  read.csv("projectDataSets.csv", stringsAsFactors = FALSE)
 }
 
-filesAvailable <- getFileChoices() # Get file list to populate the drop down menu
+projects<- getProjects()
 
 
 ui <- fluidPage(
@@ -34,14 +26,10 @@ ui <- fluidPage(
     
     # Sidebar panel for inputs ----
     sidebarPanel(
-      selectInput("fileChooser", "Choose a file",
-                  choices = filesAvailable, selected = filesAvailable[1]),
-      # for now we are hardcoding the cell types
-      # in future we want to get the distinct cell type values 
-      # for each file when the file is selected
-      # TODO fix that....
-      selectInput("cellTypeChooser", "Choose a cell type",
-                  choices = c("DC", "DP"), selected = "DC"
+      selectInput("projectChooser", "Choose a project dataset",
+                  choices = projects$projectName, selected = ""),
+      selectInput("groupChooser", "Choose a dataset group",
+                  choices = "", selected = ""
       ),
       actionButton(inputId = "submitButton",
                    label = "Submit")
@@ -75,24 +63,41 @@ ui <- fluidPage(
 
 
 server <- function(input, output, session) {
-  # TODO add a function to get the data
-  
-  getData <- eventReactive(input$submitButton, {
+  # This gets the metadata for the chosen project
+  getMetaData <- eventReactive(input$projectChooser, {
     # print(sessionInfo())
-    counts <- data.frame(read_delim(input$fileChooser,
-                                    "\t", escape_double = FALSE, trim_ws = TRUE))
-    theseCells <- dplyr::select(counts, contains(input$cellTypeChooser))
-    rownames(theseCells) <- counts$GeneSymbol
-    theseCells
-  })
-  getMetaData <- eventReactive(input$submitButton, {
-    metadataFile <- gsub("\\.txt$", ".csv", input$fileChooser)
-    metadataFile <- gsub("\\.counts\\.", ".metadata.", metadataFile)
-    metadata <- data.frame(read.csv(metadataFile), stringsAsFactors = TRUE)
-    thisMeta <- dplyr::filter(metadata, grepl(input$cellTypeChooser, sampleName)==TRUE)
-    thisMeta
+    whichData <- filter(projects, projects$projectName == input$projectChooser)
+    studyDesign <- read.csv(whichData$studyDesign, stringsAsFactors = FALSE)
+    return(studyDesign)
   })
   
+  # This observes what the user chooses for the project and updates the values possible in the group dropdown
+  observe({
+           values <- unique(getMetaData()$cellType)
+    # Can also set the label and select items
+    updateSelectInput(session, "groupChooser",
+                      choices = values)
+  })
+  
+  # This goes and gets the right dataset after the user clicks submit, subsets and reformats that data to show only the specific data group
+  getData <- eventReactive(input$submitButton, {
+      # print(sessionInfo())
+      whichData <- filter(projects, projects$projectName == input$projectChooser)
+      counts <- read.table(whichData$countsData, header = TRUE)
+      rownames(counts) <- counts$GeneSymbol
+      counts$GeneSymbol <- NULL
+      whichSamples <- getMetaData() %>% filter(cellType == input$groupChooser)
+      ifelse(input$projectChooser == "TGR", dataToUse <- whichSamples$molecular_id,
+             dataToUse <- whichSamples$sampleName)
+      colnames(counts)<- gsub("\\.", "-", colnames(counts)) # WTF????
+      #print(head(rownames(counts)))
+      countsSub <- counts[,dataToUse]
+      rownames(countsSub) <- rownames(counts) #WTFx2!!!!
+      #print(head(rownames(countsSub)))
+      return(countsSub)
+    })
+    
+  # This creates a rendered counts table with Gene Symbol as a column
   output$mytable = DT::renderDT({
     getData()
   }, rownames = TRUE, colnames = c('Gene Symbol' = 1))
@@ -104,24 +109,16 @@ server <- function(input, output, session) {
     counts.m <- as.matrix(cells)
     data <- DGEList(counts.m)
     l <- makeUSPlot()
-    #keep.exprs <- filterByExpr(l$data, group=metadata$group)
-    #data <- l$data[keep.exprs,, keep.lib.sizes=FALSE]
     #Normalising gene expression distributions
     data <- calcNormFactors(data, method = "TMM")
-    #keep.exprs <- filterByExpr(cells, group=metadata$group)
-    #data <- data[keep.exprs,, keep.lib.sizes=FALSE]
-    #data <- calcNormFactors(data, method = "TMM")
-    print(metadata$group)
-
-    design <- model.matrix(~0+metadata$group)
+    design <- model.matrix(~0+metadata$timepoint)
     str(design)
-    colnames(design) <- gsub("group", "", colnames(design))
+    colnames(design) <- gsub("timepoint", "", colnames(design))
     contr.matrix <- makeContrasts(
       DC.D0vsD4 = D0 - D4, 
       DC.D0vsD7 = D0 - D7,
       DC.D4vsD7 = D4 - D7,
       levels = colnames(design))
-
     # par(mfrow=c(1,2))
     v <- voom(data, design, plot=TRUE)
     vfit <- lmFit(v, design)
@@ -136,27 +133,26 @@ server <- function(input, output, session) {
 
   makeUSPlot <- eventReactive(input$submitButton, {
     cells <- getData()
-    metadata <- getMetaData()
+    metadata <- getMetaData() %>% filter(cellType == input$groupChooser)
     counts.m <- as.matrix(cells)
+    rownames(counts.m) <- rownames(cells)
     data <- DGEList(counts.m)
     colnames(data) <- metadata$sampleName
     data$samples$batch <- metadata$batch
-    data$samples$group <- metadata$group
+    data$samples$timepoint <- metadata$timepoint
     data$genes <- select(Mus.musculus, keys=rownames(cells), 
                          columns=c("ENTREZID", "TXCHROM"), 
                          keytype="SYMBOL") %>% filter(!duplicated(SYMBOL))
     lcpm <- cpm(data, log=TRUE)
-    # col.batch <- batch
     col.batch <- metadata$batch
     levels(col.batch) <-  brewer.pal(nlevels(metadata$batch), "Set2")
     col.batch <- as.character(col.batch)
     return (list(lcpm=lcpm, batch=metadata$batch, col.batch=col.batch, data=data, dim=c(3,4)))
   })
   
-  
   output$leftUSPlot <- renderPlot({
     left <- makeUSPlot()
-    plotMDS(left$lcpm, labels=left$group, col=left$col.group)
+    plotMDS(left$lcpm, labels=left$timepoint, col=left$col.timepoint)
   })
   
   output$rightUSPlot <- renderPlot({
