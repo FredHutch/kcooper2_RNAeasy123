@@ -7,7 +7,7 @@ library(limma); library(Glimma); library(edgeR)
 library(Mus.musculus)
 library(RColorBrewer); library(gplots)
 library(msigdbr)
-library(DT); library(plotly)
+library(DT); #library(plotly) # will likely need this later
 
 getProjects <- function() {
   read.csv("projectDataSets.csv", stringsAsFactors = FALSE)
@@ -25,7 +25,7 @@ ui <- fluidPage(
   sidebarLayout(
     
     # Sidebar panel for inputs ----
-    sidebarPanel(
+    sidebarPanel(width = 3,
       selectInput("projectChooser", "Choose a project dataset",
                   choices = projects$projectName, selected = ""),
       selectInput("groupChooser", "Choose a dataset group",
@@ -58,10 +58,6 @@ ui <- fluidPage(
   )
 )
 
-# add an action button on the left side
-
-
-
 server <- function(input, output, session) {
   # This gets the metadata for the chosen project
   getMetaData <- eventReactive(input$projectChooser, {
@@ -89,10 +85,10 @@ server <- function(input, output, session) {
       whichSamples <- getMetaData() %>% filter(cellType == input$groupChooser)
       ifelse(input$projectChooser == "TGR", dataToUse <- whichSamples$molecular_id,
              dataToUse <- whichSamples$sampleName)
-      colnames(counts)<- gsub("\\.", "-", colnames(counts)) # WTF????
+      colnames(counts)<- gsub("\\.", "-", colnames(counts)) # WTF????  Why is it reading in the file and then teh column names have .'s in them instead of -'s?
       #print(head(rownames(counts)))
       countsSub <- counts[,dataToUse]
-      rownames(countsSub) <- rownames(counts) #WTFx2!!!!
+      rownames(countsSub) <- rownames(counts) #WTFx2!!!! This refused to replace the rowname indexes with actual text strings on one computer.  
       #print(head(rownames(countsSub)))
       return(countsSub)
     })
@@ -140,12 +136,12 @@ server <- function(input, output, session) {
     colnames(data) <- metadata$sampleName
     data$samples$batch <- metadata$batch
     data$samples$timepoint <- metadata$timepoint
-    data$genes <- select(Mus.musculus, keys=rownames(cells), 
+    data$genes <- suppressMessages(select(Mus.musculus, keys=rownames(cells), 
                          columns=c("ENTREZID", "TXCHROM"), 
-                         keytype="SYMBOL") %>% filter(!duplicated(SYMBOL))
+                         keytype="SYMBOL") %>% filter(!duplicated(SYMBOL)))
     lcpm <- cpm(data, log=TRUE)
-    col.batch <- metadata$batch
-    levels(col.batch) <-  brewer.pal(nlevels(metadata$batch), "Set2")
+    col.batch <- as.factor(metadata$batch)
+    levels(col.batch) <-  brewer.pal(nlevels(col.batch)+1, "Dark2")
     col.batch <- as.character(col.batch)
     return (list(lcpm=lcpm, batch=metadata$batch, col.batch=col.batch, data=data, dim=c(3,4)))
   })
