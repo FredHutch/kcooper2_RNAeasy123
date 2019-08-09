@@ -35,7 +35,7 @@ ui <- fluidPage(
     # Sidebar panel for inputs ----
     sidebarPanel(
       selectInput("fileChooser", "Choose a file",
-                  choices = filesAvailable, selected = filesAvailable[1]),
+                  choices = filesAvailable, selected = filesAvailable),
       # for now we are hardcoding the cell types
       # in future we want to get the distinct cell type values 
       # for each file when the file is selected
@@ -59,11 +59,10 @@ ui <- fluidPage(
                              column(6, h2(align="center", "B. Batch"), plotOutput("rightUSPlot"))
                            )
                   ),
-                  tabPanel("Mean-variance trends",
-                    fluidRow(
-                      column(6, h2(align="center", "voom: Mean-variance trend"), plotOutput("leftMVPlot")),
-                      column(6, h2(align="center", "Final model: Mean-variance trend"), plotOutput("rightMVPlot"))
-                    )
+                  tabPanel("# of DE Genes",
+                    selectInput("testChooser", "Choose a statistical test",
+                      choices=c("efit", "tfit")),
+                    DTOutput("testTable")
                   )
       )
     )
